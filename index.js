@@ -1,5 +1,11 @@
-import { Rectangle, Circle, Triangle, Pentagon } from "./units.js";
-import { resolveCollisions, handleDeath, drawSelection } from "./helpers.js";
+import { Polygon } from "./units.js";
+import { UNIT_STATS } from "./constants.js";
+import {
+  resolveCollisions,
+  handleDeath,
+  drawSelection,
+  createCollisionSparks,
+} from "./helpers.js";
 
 const canvas = document.getElementById("myCanvas");
 const ctx = canvas.getContext("2d");
@@ -8,14 +14,20 @@ window.addEventListener("contextmenu", (e) => e.preventDefault());
 
 let shapes = [];
 let effects = [];
-const classes = [Rectangle, Circle, Triangle, Pentagon];
+
+const unitTypes = [
+  UNIT_STATS.TRIANGLE,
+  UNIT_STATS.RECTANGLE,
+  UNIT_STATS.PENTAGON,
+  UNIT_STATS.CIRCLE,
+];
 
 const startX = 100;
 const startY = 100;
-const spacing = 70;
+const spacing = 80;
 
-classes.forEach((SpecificClass, i) => {
-  shapes.push(new SpecificClass(startX, startY + i * spacing));
+unitTypes.forEach((stats, i) => {
+  shapes.push(new Polygon(startX, startY + i * spacing, stats));
 });
 
 let selection = {
@@ -39,7 +51,7 @@ function animate() {
   shapes.forEach((s) => s.update());
 
   for (let i = 0; i < 3; i++) {
-    resolveCollisions(shapes);
+    resolveCollisions(shapes, effects, createCollisionSparks);
   }
 
   shapes.forEach((s) => s.draw(ctx));
@@ -112,6 +124,31 @@ canvas.addEventListener("mousemove", (e) => {
     });
   }
 });
+
+window.addEventListener(
+  "wheel",
+  (e) => {
+    let adjusted = false;
+    console.log(shapes);
+    shapes.forEach((shape) => {
+      if (shape.isSelected) {
+        const rotateSpeed = 0.15;
+
+        if (e.deltaY < 0) {
+          shape.rotation -= rotateSpeed;
+        } else {
+          shape.rotation += rotateSpeed;
+        }
+        adjusted = true;
+      }
+    });
+
+    if (adjusted) {
+      e.preventDefault();
+    }
+  },
+  { passive: false },
+);
 
 window.addEventListener("keydown", (e) => {
   if (e.key.toLowerCase() === "s") {

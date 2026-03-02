@@ -1,6 +1,22 @@
-import { Explosion } from "./explosion.js";
+import { Particle, Explosion } from "./explosion.js";
 
-export function resolveCollisions(shapes) {
+export function createCollisionSparks(s1, s2, nx, ny, effects) {
+  const sparkCount = 3;
+  const contactX = s1.x + nx * s1.radius;
+  const contactY = s1.y + ny * s1.radius;
+
+  for (let i = 0; i < sparkCount; i++) {
+    const angle = Math.atan2(ny, nx) + (Math.random() - 0.5) * Math.PI * 0.5;
+    const speed = Math.random() * 4 + 2;
+    // Iskry są żółto-pomarańczowe
+    const color = Math.random() > 0.5 ? "#fff" : "#ffcc00";
+
+    effects.push(
+      new Particle(contactX, contactY, color, speed, angle, 0.9, 0.2),
+    );
+  }
+}
+export function resolveCollisions(shapes, effects, createCollisionSparks) {
   for (let i = 0; i < shapes.length; i++) {
     for (let j = i + 1; j < shapes.length; j++) {
       let s1 = shapes[i];
@@ -12,16 +28,17 @@ export function resolveCollisions(shapes) {
       let minDistance = s1.radius + s2.radius;
 
       if (distance < minDistance && distance > 0) {
-        const damageToS2 = Math.max(0.1, s1.attack * 0.05 - s2.defense * 0.02);
+        let overlap = minDistance - distance;
+        let nx = dx / distance;
+        let ny = dy / distance;
 
+        createCollisionSparks(s1, s2, nx, ny, effects);
+
+        const damageToS2 = Math.max(0.1, s1.attack * 0.05 - s2.defense * 0.02);
         const damageToS1 = Math.max(0.1, s2.attack * 0.05 - s1.defense * 0.02);
 
         s1.hp -= damageToS1;
         s2.hp -= damageToS2;
-
-        let overlap = minDistance - distance;
-        let nx = dx / distance;
-        let ny = dy / distance;
 
         let totalMass = s1.mass + s2.mass;
         let ratio1 = s2.mass / totalMass;
@@ -49,13 +66,12 @@ export function resolveCollisions(shapes) {
     }
   }
 }
-
 export function handleDeath(deadUnits, allUnits, effects) {
   deadUnits.forEach((unit) => {
     effects.push(new Explosion(unit.x, unit.y, unit.color));
 
-    const blastRadius = 150;
-    const blastForce = 15;
+    const blastRadius = 50;
+    const blastForce = 10;
 
     allUnits.forEach((other) => {
       if (other.hp > 0 && other !== unit) {
@@ -69,8 +85,6 @@ export function handleDeath(deadUnits, allUnits, effects) {
           const fy = (dy / dist) * blastForce * power;
 
           other.applyImpulse(fx, fy);
-
-          other.hp -= 5 * power;
         }
       }
     });

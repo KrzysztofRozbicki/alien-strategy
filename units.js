@@ -1,4 +1,4 @@
-import { COLOR, UNIT_STATS } from "./constants.js";
+import { PHYSICS, UNIT_STATS, UNIT_PROPERTIES } from "./constants.js";
 
 class Shape {
   constructor(x, y, stats = {}) {
@@ -7,31 +7,31 @@ class Shape {
     this.targetX = x;
     this.targetY = y;
 
-    this.size = stats.size || 40;
-    this.hp = stats.hp || 100;
-    this.maxHp = stats.hp || 100;
-    this.attack = stats.attack || 10;
-    this.defense = stats.defense || 5;
-    this.speed = stats.speed || 0.05;
-    this.color = stats.color || "gray";
-    this.price = stats.price || 100;
-    this.mass = stats.mass || 1;
+    this.size = stats.size;
+    this.hp = stats.hp;
+    this.maxHp = stats.hp;
+    this.attack = stats.attack;
+    this.defense = stats.defense;
+    this.speed = stats.speed;
+    this.color = stats.color;
+    this.price = stats.price;
+    this.mass = stats.mass;
+    this.rotation = 0;
 
-    this.radius = this.size / 1.2;
+    this.radius = this.size / 2;
     this.isSelected = false;
 
     this.vx = 0;
     this.vy = 0;
-    this.friction = 0.95;
+    this.friction = PHYSICS.friction;
   }
 
-  applyImpulse(forceX, forceY) {
-    this.x += forceX;
-    this.y += forceY;
-    this.targetX += forceX;
-    this.targetY += forceY;
-    this.vx += forceX;
-    this.vy += forceY;
+  applyImpulse(fx, fy) {
+    this.vx += fx;
+    this.vy += fy;
+
+    this.targetX = this.x + fx * PHYSICS.impulseToTarget;
+    this.targetY = this.y + fy * PHYSICS.impulseToTarget;
   }
 
   stop() {
@@ -39,20 +39,39 @@ class Shape {
     this.targetY = this.y;
   }
 
-  update() {
+  update(canvasWidth, canvasHeight) {
     this.x += this.vx;
     this.y += this.vy;
 
     this.vx *= this.friction;
     this.vy *= this.friction;
 
+    if (this.x - this.radius < 0) {
+      this.x = this.radius;
+      this.vx *= -1;
+      this.targetX = this.x + Math.abs(this.vx) * PHYSICS.predictionFactor;
+    } else if (this.x + this.radius > canvasWidth) {
+      this.x = canvasWidth - this.radius;
+      this.vx *= -1;
+      this.targetX = this.x - Math.abs(this.vx) * PHYSICS.predictionFactor;
+    }
+
+    if (this.y - this.radius < 0) {
+      this.y = this.radius;
+      this.vy *= -1;
+      this.targetY = this.y + Math.abs(this.vy) * PHYSICS.predictionFactor;
+    } else if (this.y + this.radius > canvasHeight) {
+      this.y = canvasHeight - this.radius;
+      this.vy *= -1;
+      this.targetY = this.y - Math.abs(this.vy) * PHYSICS.predictionFactor;
+    }
+
     let dx = this.targetX - this.x;
     let dy = this.targetY - this.y;
     let distance = Math.hypot(dx, dy);
 
-    if (distance > 0.1) {
-      let currentSpeed = this.speed * 500;
-
+    if (distance > 1) {
+      let currentSpeed = this.speed * PHYSICS.speedMultiplier;
       if (distance < currentSpeed) {
         this.x = this.targetX;
         this.y = this.targetY;
@@ -75,6 +94,7 @@ class Shape {
   render(ctx, drawPath) {
     ctx.save();
     ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
 
     ctx.beginPath();
     drawPath(ctx, this.size);
@@ -99,9 +119,9 @@ class Shape {
 
     const hpRatio = Math.max(0, this.hp / this.maxHp);
 
-    if (hpRatio > 0.6) {
+    if (hpRatio > UNIT_PROPERTIES.hpYellow) {
       ctx.fillStyle = "#2ecc71";
-    } else if (hpRatio > 0.3) {
+    } else if (hpRatio > UNIT_PROPERTIES.hpRed) {
       ctx.fillStyle = "#f1c40f";
     } else {
       ctx.fillStyle = "#e74c3c";
@@ -109,54 +129,40 @@ class Shape {
 
     ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
   }
-}
 
-export class Rectangle extends Shape {
-  constructor(x, y, stats = UNIT_STATS.RECTANGLE) {
-    super(x, y, stats);
-  }
-  draw(ctx) {
-    this.render(ctx, (ctx, size) => {
-      ctx.rect(-size / 2, -size / 2, size, size);
-    });
-  }
-}
-
-export class Circle extends Shape {
-  constructor(x, y, stats = UNIT_STATS.CIRCLE) {
-    super(x, y, stats);
-  }
-  draw(ctx) {
-    this.render(ctx, (ctx, size) => {
-      ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
-    });
-  }
-}
-
-export class Triangle extends Shape {
-  constructor(x, y, stats = UNIT_STATS.TRIANGLE) {
-    super(x, y, stats);
-  }
-  draw(ctx) {
-    this.render(ctx, (ctx, size) => {
-      ctx.moveTo(0, -size / 2);
-      ctx.lineTo(size / 2, size / 2);
-      ctx.lineTo(-size / 2, size / 2);
-    });
-  }
-}
-
-export class Pentagon extends Shape {
-  constructor(x, y, stats = UNIT_STATS.PENTAGON) {
-    super(x, y, stats);
-  }
-  draw(ctx) {
+  drawPolygon(ctx, sides) {
     this.render(ctx, (ctx, size) => {
       const radius = size / 2;
-      for (let i = 0; i < 5; i++) {
-        const angle = (i * 2 * Math.PI) / 5 - Math.PI / 2;
-        ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        const angle = (i * 2 * Math.PI) / sides - Math.PI / 2;
+        const px = Math.cos(angle) * radius;
+        const py = Math.sin(angle) * radius;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
       }
+      ctx.closePath();
     });
+  }
+}
+
+export class Polygon extends Shape {
+  constructor(x, y, stats) {
+    super(x, y, stats);
+    // Jeśli sides nie jest zdefiniowane w stats, domyślnie ustawiamy 0 dla koła
+    this.sides = stats?.sides || 0;
+  }
+
+  draw(ctx) {
+    if (this.sides > 2) {
+      this.drawPolygon(ctx, this.sides);
+    } else {
+      this.render(ctx, (ctx, size) => {
+        ctx.beginPath();
+        ctx.arc(0, 0, size / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
+    }
   }
 }

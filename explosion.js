@@ -1,17 +1,15 @@
-class Particle {
-  constructor(x, y, color) {
+export class Particle {
+  constructor(x, y, color, speed, angle, friction = 0.95, gravity = 0.1) {
     this.x = x;
     this.y = y;
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 8 + 2;
     this.vx = Math.cos(angle) * speed;
     this.vy = Math.sin(angle) * speed;
-    this.friction = 0.92;
-    this.gravity = 0.15;
-    this.size = Math.random() * 5 + 2;
+    this.friction = friction;
+    this.gravity = gravity;
+    this.size = Math.random() * 3 + 1;
     this.color = color;
     this.alpha = 1;
-    this.decay = Math.random() * 0.02 + 0.01;
+    this.decay = Math.random() * 0.05 + 0.03;
   }
 
   update() {
@@ -24,12 +22,12 @@ class Particle {
   }
 
   draw(ctx) {
+    if (this.alpha <= 0) return;
+    ctx.save();
     ctx.globalAlpha = this.alpha;
     ctx.fillStyle = this.color;
-    ctx.shadowBlur = 5;
-    ctx.shadowColor = "red";
     ctx.fillRect(this.x, this.y, this.size, this.size);
-    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 }
 
