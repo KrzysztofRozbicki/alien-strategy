@@ -129,7 +129,6 @@ window.addEventListener(
   "wheel",
   (e) => {
     let adjusted = false;
-    console.log(shapes);
     shapes.forEach((shape) => {
       if (shape.isSelected) {
         const rotateSpeed = 0.15;
