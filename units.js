@@ -1,43 +1,4 @@
-const COLOR = "rgba(0,100,255,1)";
-
-const UNIT_STATS = {
-  RECTANGLE: {
-    color: COLOR,
-    speed: 0.004,
-    hp: 200,
-    attack: 15,
-    defense: 20,
-    size: 45,
-    price: 150,
-  },
-  CIRCLE: {
-    color: COLOR,
-    speed: 0.008,
-    hp: 100,
-    attack: 10,
-    defense: 5,
-    size: 40,
-    price: 100,
-  },
-  TRIANGLE: {
-    color: COLOR,
-    speed: 0.012,
-    hp: 60,
-    attack: 25,
-    defense: 2,
-    size: 35,
-    price: 120,
-  },
-  PENTAGON: {
-    color: COLOR,
-    speed: 0.01,
-    hp: 120,
-    attack: 18,
-    defense: 10,
-    size: 42,
-    price: 130,
-  },
-};
+import { COLOR, UNIT_STATS } from "./constants.js";
 
 class Shape {
   constructor(x, y, stats = {}) {
@@ -54,9 +15,23 @@ class Shape {
     this.speed = stats.speed || 0.05;
     this.color = stats.color || "gray";
     this.price = stats.price || 100;
+    this.mass = stats.mass || 1;
 
     this.radius = this.size / 1.2;
     this.isSelected = false;
+
+    this.vx = 0;
+    this.vy = 0;
+    this.friction = 0.95;
+  }
+
+  applyImpulse(forceX, forceY) {
+    this.x += forceX;
+    this.y += forceY;
+    this.targetX += forceX;
+    this.targetY += forceY;
+    this.vx += forceX;
+    this.vy += forceY;
   }
 
   stop() {
@@ -65,38 +40,42 @@ class Shape {
   }
 
   update() {
-    const dx = this.targetX - this.x;
-    const dy = this.targetY - this.y;
-    const distance = Math.hypot(dx, dy);
+    this.x += this.vx;
+    this.y += this.vy;
 
-    if (distance > 1) {
-      this.x += (dx / distance) * (this.speed * 100);
-      this.y += (dy / distance) * (this.speed * 100);
-    } else {
-      this.x = this.targetX;
-      this.y = this.targetY;
+    this.vx *= this.friction;
+    this.vy *= this.friction;
+
+    let dx = this.targetX - this.x;
+    let dy = this.targetY - this.y;
+    let distance = Math.hypot(dx, dy);
+
+    if (distance > 0.1) {
+      let currentSpeed = this.speed * 500;
+
+      if (distance < currentSpeed) {
+        this.x = this.targetX;
+        this.y = this.targetY;
+      } else {
+        this.x += (dx / distance) * currentSpeed;
+        this.y += (dy / distance) * currentSpeed;
+      }
     }
   }
+
   copy() {
     const offset = this.size;
     const angle = Math.random() * Math.PI * 2;
     const newX = this.x + Math.cos(angle) * offset;
     const newY = this.y + Math.sin(angle) * offset;
 
-    return new this.constructor(newX, newY, {
-      size: this.size,
-      hp: this.maxHp, // Nowy zaczyna z pełnym HP
-      attack: this.attack,
-      defense: this.defense,
-      speed: this.speed,
-      color: this.color,
-      price: this.price,
-    });
+    return new this.constructor(newX, newY);
   }
 
   render(ctx, drawPath) {
     ctx.save();
     ctx.translate(this.x, this.y);
+
     ctx.beginPath();
     drawPath(ctx, this.size);
     ctx.closePath();
@@ -106,10 +85,29 @@ class Shape {
     if (this.isSelected) {
       ctx.strokeStyle = "#fff";
       ctx.lineWidth = 3;
-      ctx.lineJoin = "round";
       ctx.stroke();
     }
     ctx.restore();
+
+    const barWidth = this.size;
+    const barHeight = 4;
+    const barX = this.x - barWidth / 2;
+    const barY = this.y - this.size + 10;
+
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(barX, barY, barWidth, barHeight);
+
+    const hpRatio = Math.max(0, this.hp / this.maxHp);
+
+    if (hpRatio > 0.6) {
+      ctx.fillStyle = "#2ecc71";
+    } else if (hpRatio > 0.3) {
+      ctx.fillStyle = "#f1c40f";
+    } else {
+      ctx.fillStyle = "#e74c3c";
+    }
+
+    ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
   }
 }
 

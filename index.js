@@ -1,4 +1,5 @@
 import { Rectangle, Circle, Triangle, Pentagon } from "./units.js";
+import { resolveCollisions, handleDeath, drawSelection } from "./helpers.js";
 
 const canvas = document.getElementById("myCanvas");
 const ctx = canvas.getContext("2d");
@@ -6,17 +7,16 @@ const ctx = canvas.getContext("2d");
 window.addEventListener("contextmenu", (e) => e.preventDefault());
 
 let shapes = [];
+let effects = [];
 const classes = [Rectangle, Circle, Triangle, Pentagon];
 
-for (let i = 0; i < 8; i++) {
-  const RandomClass = classes[i % classes.length];
-  shapes.push(
-    new RandomClass(
-      Math.random() * window.innerWidth,
-      Math.random() * window.innerHeight,
-    ),
-  );
-}
+const startX = 100;
+const startY = 100;
+const spacing = 70;
+
+classes.forEach((SpecificClass, i) => {
+  shapes.push(new SpecificClass(startX, startY + i * spacing));
+});
 
 let selection = {
   startX: 0,
@@ -29,54 +29,29 @@ let selection = {
 function animate() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  const dead = shapes.filter((s) => s.hp <= 0);
+
+  if (dead.length > 0) {
+    handleDeath(dead, shapes, effects);
+    shapes = shapes.filter((s) => s.hp > 0);
+  }
+
   shapes.forEach((s) => s.update());
 
   for (let i = 0; i < 3; i++) {
-    resolveCollisions();
+    resolveCollisions(shapes);
   }
 
   shapes.forEach((s) => s.draw(ctx));
 
-  if (selection.isActive) {
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.5)";
-    ctx.setLineDash([5, 5]);
-    ctx.lineWidth = 1;
-    ctx.strokeRect(
-      selection.startX,
-      selection.startY,
-      selection.currentX - selection.startX,
-      selection.currentY - selection.startY,
-    );
-    ctx.setLineDash([]);
-  }
+  effects.forEach((e) => e.update());
+  effects = effects.filter((e) => !e.isFinished);
+  effects.forEach((e) => e.draw(ctx));
+
+  drawSelection(ctx, selection);
+
   requestAnimationFrame(animate);
 }
-
-function resolveCollisions() {
-  for (let i = 0; i < shapes.length; i++) {
-    for (let j = i + 1; j < shapes.length; j++) {
-      let s1 = shapes[i];
-      let s2 = shapes[j];
-
-      let dx = s2.x - s1.x;
-      let dy = s2.y - s1.y;
-      let distance = Math.hypot(dx, dy);
-      let minDistance = s1.radius + s2.radius;
-
-      if (distance < minDistance) {
-        let overlap = minDistance - distance;
-        let nx = dx / distance;
-        let ny = dy / distance;
-
-        s1.x -= nx * (overlap / 2);
-        s1.y -= ny * (overlap / 2);
-        s2.x += nx * (overlap / 2);
-        s2.y += ny * (overlap / 2);
-      }
-    }
-  }
-}
-
 canvas.addEventListener("mousedown", (e) => {
   if (e.button === 0) {
     selection.isActive = true;
